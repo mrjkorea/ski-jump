@@ -1,0 +1,89 @@
+{
+  "pack_id": "one-plus-words-v1",
+  "title": "Ski Jump — One Plus",
+  "module_id": "ski_jump",
+  "activity_id": "slope_jump",
+  "skill_tags": ["math-words", "addition", "a1"],
+  "ui_locale": "en",
+  "seconds": 15,
+  "mastery_correct": 3,
+  "items": [
+    {
+      "item_id": "plus01",
+      "question": "one plus one = ___",
+      "correct": "two",
+      "wrong": ["three", "four"],
+      "skill_tags": ["addition-words"]
+    },
+    {
+      "item_id": "plus02",
+      "question": "one plus two = ___",
+      "correct": "three",
+      "wrong": ["two", "five"],
+      "skill_tags": ["addition-words"]
+    },
+    {
+      "item_id": "plus03",
+      "question": "one plus three = ___",
+      "correct": "four",
+      "wrong": ["three", "six"],
+      "skill_tags": ["addition-words"]
+    },
+    {
+      "item_id": "plus04",
+      "question": "one plus four = ___",
+      "correct": "five",
+      "wrong": ["four", "seven"],
+      "skill_tags": ["addition-words"]
+    },
+    {
+      "item_id": "plus05",
+      "question": "one plus five = ___",
+      "correct": "six",
+      "wrong": ["five", "eight"],
+      "skill_tags": ["addition-words"]
+    },
+    {
+      "item_id": "plus06",
+      "question": "one plus six = ___",
+      "correct": "seven",
+      "wrong": ["six", "nine"],
+      "skill_tags": ["addition-words"]
+    },
+    {
+      "item_id": "plus07",
+      "question": "one plus seven = ___",
+      "correct": "eight",
+      "wrong": ["seven", "ten"],
+      "skill_tags": ["addition-words"]
+    },
+    {
+      "item_id": "plus08",
+      "question": "one plus eight = ___",
+      "correct": "nine",
+      "wrong": ["eight", "eleven"],
+      "skill_tags": ["addition-words"]
+    },
+    {
+      "item_id": "plus09",
+      "question": "one plus nine = ___",
+      "correct": "ten",
+      "wrong": ["nine", "twelve"],
+      "skill_tags": ["addition-words"]
+    },
+    {
+      "item_id": "plus10",
+      "question": "one plus ten = ___",
+      "correct": "eleven",
+      "wrong": ["ten", "twelve"],
+      "skill_tags": ["addition-words"]
+    },
+    {
+      "item_id": "plus11",
+      "question": "one plus eleven = ___",
+      "correct": "twelve",
+      "wrong": ["eleven", "ten"],
+      "skill_tags": ["addition-words"]
+    }
+  ]
+}
