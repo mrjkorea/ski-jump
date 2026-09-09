@@ -1,0 +1,9 @@
+Ski Jump audio (local files only — no speechSynthesis, no /api/tts).
+
+SFX (procedural, baked to mp3):
+  ski-jump.mp3, snow-whoosh.mp3, tree-crash.mp3, crowd-cheer.mp3
+
+Word / question cues (baked mp3s named from the JSON pack, not a hardcoded engine list):
+  {slug(question)}.mp3 and {slug(correct)}.mp3
+
+Play-time loading uses relative ./audio/*.mp3 paths from the Pages site.
