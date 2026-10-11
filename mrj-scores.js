@@ -30,16 +30,29 @@
     );
   }
 
+  function idKey(s) {
+    return String(s == null ? "" : s).trim().toLowerCase().replace(/\s+/g, " ");
+  }
+
+  function signedIn() {
+    try {
+      return root.MRJ_AUTH && root.MRJ_AUTH.student
+        ? String(root.MRJ_AUTH.student() || "").trim()
+        : "";
+    } catch (e) {
+      return "";
+    }
+  }
+
   /* One finished item -> one row in ClassroomMetrics. */
   function post(opts) {
     opts = opts || {};
-    var authed = "";
-    try {
-      authed = root.MRJ_AUTH && root.MRJ_AUTH.student ? root.MRJ_AUTH.student() : "";
-    } catch (e) {}
-    var student = String(authed || opts.student || "").trim();
+    var student = signedIn() || String(opts.student || "").trim();
+    if (!student) return Promise.resolve({ status: "skipped", error: "no student" });
+    var key = idKey(student);
     var itemId = String(opts.itemId || uid("item"));
     var when = opts.when ? new Date(opts.when) : new Date();
+    var program = opts.program || "unknown";
     var pct =
       typeof opts.scorePct === "number"
         ? opts.scorePct
@@ -47,31 +60,33 @@
           ? Math.round((Number(opts.scoreValue || 0) / Number(opts.scoreMax)) * 100)
           : "";
 
+    var event = {
+      event_id: opts.eventId || uid(program),
+      event_kind: opts.eventKind || "learning_result",
+      source: opts.source || "mrj-web",
+      curriculum_program: program,
+      app_name: opts.appName || opts.program || "MRJ",
+      book_title: opts.bookTitle || "",
+      unit_title: opts.unitTitle || "",
+      item_id: itemId,
+      item_type: opts.itemType || "activity",
+      score_value: typeof opts.scoreValue === "number" ? opts.scoreValue : "",
+      score_max: typeof opts.scoreMax === "number" ? opts.scoreMax : "",
+      score_pct: pct,
+      correctness: opts.correctness || "",
+      completed: opts.completed !== false,
+      duration_seconds: opts.durationSeconds || "",
+      local_date: localDate(when),
+      identity_method: "mrj_signin",
+      identity_confidence: "high",
+      metadata_json: JSON.stringify(opts.metadata || {}),
+    };
+
     var body = {
-      student_email: student.indexOf("@") > 0 ? student : "unknown",
+      student_email: student.indexOf("@") > 0 ? student : key,
       student_name: student,
-      session_id: [opts.program || "mrj", student || "anon", localDate(when)].join("-"),
-      events: [
-        {
-          event_id: opts.eventId || uid(opts.program || "mrj"),
-          event_kind: opts.eventKind || "learning_result",
-          source: opts.source || "mrj-web",
-          curriculum_program: opts.program || "unknown",
-          app_name: opts.appName || opts.program || "MRJ",
-          book_title: opts.bookTitle || "",
-          unit_title: opts.unitTitle || "",
-          item_id: itemId,
-          item_type: opts.itemType || "activity",
-          score_value: typeof opts.scoreValue === "number" ? opts.scoreValue : "",
-          score_max: typeof opts.scoreMax === "number" ? opts.scoreMax : "",
-          score_pct: pct,
-          correctness: opts.correctness || "",
-          completed: opts.completed !== false,
-          duration_seconds: opts.durationSeconds || "",
-          local_date: localDate(when),
-          metadata_json: JSON.stringify(opts.metadata || {}),
-        },
-      ],
+      session_id: [program, key, localDate(when)].join("-"),
+      events: [event],
     };
 
     var sent = fetch(ENDPOINT, {
@@ -79,15 +94,11 @@
       headers: { "Content-Type": "text/plain;charset=utf-8" },
       body: JSON.stringify(body),
       redirect: "follow",
-    })
-    var signedIn = "";
-    try {
-      signedIn = root.MRJ_AUTH && root.MRJ_AUTH.student ? String(root.MRJ_AUTH.student() || "").trim() : "";
-    } catch (e2) {}
-    if (signedIn && root.MRJ_AUTH && typeof root.MRJ_AUTH.noteScore === "function") {
+    });
+    if (root.MRJ_AUTH && typeof root.MRJ_AUTH.noteScore === "function") {
       try {
         root.MRJ_AUTH.noteScore({
-          program: opts.program || "unknown",
+          program: program,
           itemId: itemId,
           scoreValue: typeof opts.scoreValue === "number" ? opts.scoreValue : "",
           scoreMax: typeof opts.scoreMax === "number" ? opts.scoreMax : "",

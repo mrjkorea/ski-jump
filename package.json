@@ -3,6 +3,6 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "node --test test/mrj-progress.test.mjs"
+    "test": "node --check assets/index-bjTgEhWE.js && node --test test/*.test.mjs"
   }
 }
