@@ -4,7 +4,7 @@
  */
 
 export const PROGRAM = "ski-jump";
-export const BUILD = "20261007-ski-jump-progress-1";
+export const BUILD = "20261011-savefix";
 const RETRY_MS = 17000;
 
 const root = typeof globalThis !== "undefined" ? globalThis : global;
@@ -63,13 +63,29 @@ export function mergeProgressRows(existing, incoming) {
   return base.concat(incoming);
 }
 
+function itemIdForPack(rawItem, packId) {
+  const item = String(rawItem || "").trim();
+  if (!item) return "";
+  if (item.startsWith("round:")) return "";
+  const colon = item.indexOf(":");
+  if (colon > 0) {
+    const prefix = item.slice(0, colon);
+    const rest = item.slice(colon + 1);
+    if (prefix === "round") return "";
+    const pack = String(packId || "").trim();
+    if (pack && prefix !== pack) return "";
+    return rest;
+  }
+  return item;
+}
+
 /** Best pass per item across rows (union; never clears a pass). */
-export function passedMap(progress, program) {
+export function passedMap(progress, program, packId) {
   const latest = {};
   const rows = filterProgramRows(progress, program);
   for (let bi = 0; bi < rows.length; bi++) {
     const row = rows[bi];
-    const item = rowItemId(row);
+    const item = itemIdForPack(rowItemId(row), packId);
     if (!item) continue;
     const pass = rowPass(row);
     latest[item] = !!latest[item] || !!pass;

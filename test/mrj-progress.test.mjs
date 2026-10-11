@@ -4,6 +4,20 @@ import * as P from "../mrj-progress-core.mjs";
 
 const PROGRAM = "ski-jump";
 
+test("passedMap scopes pack-prefixed ids to current pack", () => {
+  const rows = [
+    { program: PROGRAM, item: "packA:q01", score: "1/1" },
+    { program: PROGRAM, item: "q02", score: "1/1" },
+    { program: PROGRAM, item: "packB:q03", score: "1/1" },
+    { program: PROGRAM, item: "round:packA", score: "4/5" },
+  ];
+  const map = P.passedMap(rows, PROGRAM, "packA");
+  assert.equal(map.q01, true);
+  assert.equal(map.q02, true);
+  assert.equal(map.q03, undefined);
+  assert.equal(map.round, undefined);
+});
+
 test("passedMap ignores other programs", () => {
   const rows = [
     { program: "leap-frog", item_id: "a", scoreValue: 1, scoreMax: 1 },
