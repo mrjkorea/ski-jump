@@ -58,3 +58,12 @@ No `speechSynthesis`, no `/api/tts`.
 ## Do-nots respected
 
 Engine + JSON pack kept; gameplay (tap + keys) kept; no TTS server; no speechSynthesis; no `node_modules`; no invented live URLs; no Seedream / BytePlus / FAL.
+
+## 2026-10-16 source rebuild
+
+- Real source now in `app/src/` (Vite + three.js); `npm run build` publishes `index.html` + `assets/` to the repo root.
+- Learning loop unchanged: definition, 3 word ramps, steer onto the right one, +100, wrong ramp = tree and the run ends; 5 right wins (Word Master: every word in the gamepack).
+- Same hooks: `MRJ_SCORES.post` rows (`<pack>:<item>` word rows, `round:<pack>` round row), `mrj-auth-ready` + `MRJ_SKI_PROGRESS` seeding, `mrj-wm-game-done` to Word Master. No local save (in-memory board only).
+- Frog leftovers gone; SFX are the baked mp3s here; CC0 music loop + mute button; iOS audio unlock on first tap.
+- Textures WebP (duplicate PNGs dropped). Auto low-quality when FPS drops, pixel ratio capped.
+- Old bundle `assets/index-bjTgEhWE.js` / `index-CkgiO3nB.css` and the jpg textures are left in place (unused) — safe to delete later.
