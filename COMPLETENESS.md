@@ -66,4 +66,9 @@ Engine + JSON pack kept; gameplay (tap + keys) kept; no TTS server; no speechSyn
 - Same hooks: `MRJ_SCORES.post` rows (`<pack>:<item>` word rows, `round:<pack>` round row), `mrj-auth-ready` + `MRJ_SKI_PROGRESS` seeding, `mrj-wm-game-done` to Word Master. No local save (in-memory board only).
 - Frog leftovers gone; SFX are the baked mp3s here; CC0 music loop + mute button; iOS audio unlock on first tap.
 - Textures WebP (duplicate PNGs dropped). Auto low-quality when FPS drops, pixel ratio capped.
-- Old bundle `assets/index-bjTgEhWE.js` / `index-CkgiO3nB.css` and the jpg textures are left in place (unused) — safe to delete later.
+- Old bundle `assets/index-bjTgEhWE.js` / `index-CkgiO3nB.css` and the jpg textures were left in place (unused) at first.
+
+## 2026-10-19 cleanup
+
+- Removed files nothing loads after the v2 build: old bundles `assets/index-bjTgEhWE.js`, `assets/index-Bt71iYDv.js`, `assets/index-CkgiO3nB.css`, and the JPG textures (`crowd`, `goggles`, `pine`, `sky`, `snow`). The game uses `assets/index-D_sthxUv.js` + `index-yf8JRdK0.css` and the WebP textures.
+- Kept every `audio/*.mp3`: word cues are looked up by slug at runtime (e.g. `twelve.mp3` for packs that use it).
