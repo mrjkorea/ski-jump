@@ -61,7 +61,9 @@ const waitView = (page, v, ms = 240000) => page.waitForFunction((v) => window.MR
 const browser = await chromium.launch({ args: ["--use-angle=swiftshader", "--enable-unsafe-swiftshader", "--autoplay-policy=no-user-gesture-required"] });
 const server = await serve(root, 0);
 const B = `http://localhost:${server.address().port}`;
+let st;
 try {
+  if (!process.env.SMOKE_WM_ONLY) {
   // ---- 1. desktop standalone: full winning run
   const posts = [];
   const { ctx, page } = await newPage(browser, { viewport: { width: 1280, height: 800 } }, posts);
@@ -87,7 +89,7 @@ try {
   await waitView(page, "end");
   await page.waitForTimeout(700);
   await page.screenshot({ path: `${out}/06-gold-medal.png` });
-  let st = await page.evaluate(() => window.MRJSkiJump.getState());
+  st = await page.evaluate(() => window.MRJSkiJump.getState());
   check(st.corrects === 5 && st.errors === 0, `win run: 5 right, 0 wrong (got ${st.corrects}/${st.errors})`);
   check(st.points >= 500, `points >= 500 with combo (got ${st.points})`);
   const words = posts.flatMap((p) => p.events).filter((e) => e.item_type === "word");
@@ -150,6 +152,7 @@ try {
   check(st.quality === "low", "?q=low forces low quality");
   await m.ctx.close();
 
+  } // end standalone part
   // ---- 4. Word Master build in an iframe: session words only, done message
   if (wmDir) {
     const host = `<!doctype html><body style="margin:0"><iframe id="f" style="border:0;width:100vw;height:100vh"></iframe><script>
