@@ -4,6 +4,7 @@ const SFX = {
   jump: "./audio/ski-jump.mp3",
   cheer: "./audio/crowd-cheer.mp3",
   crash: "./audio/tree-crash.mp3",
+  thud: "./audio/snow-thud.mp3",
 };
 const MUSIC = "./audio/music-christmas-synths.mp3";
 
@@ -89,10 +90,12 @@ export function createAudio() {
     tone(base * 1.5, 0.32, { vol: 0.22, at: 0.16 });
     play("jump", { vol: 0.9, rate: 1 + Math.min(0.5, streak * 0.05) });
   }
-  function wrong() {
-    play("crash", { vol: 1 });
-    tone(220, 0.35, { type: "sawtooth", vol: 0.08, slide: -120 });
+  function wrong() { // wrong ramp chosen: a short "uh-oh" before the twirl
+    tone(392, 0.16, { type: "square", vol: 0.07 });
+    tone(294, 0.3, { type: "square", vol: 0.07, at: 0.15, slide: -60 });
   }
+  function fall() { play("thud", { vol: 1 }); play("whoosh", { vol: 0.6, rate: 0.7 }); }
+  function treeCrash() { play("crash", { vol: 1 }); play("thud", { vol: 0.8, delay: 0.05 }); }
   function win() {
     play("cheer", { vol: 1 });
     [0, 4, 7, 12, 16].forEach((s, i) => tone(523.25 * Math.pow(2, s / 12), 0.4, { vol: 0.18, at: i * 0.11 }));
@@ -121,5 +124,5 @@ export function createAudio() {
     }
     return muted;
   }
-  return { unlock, play, correct, wrong, win, land, carve, boost, speak, startMusic, setMuted, isMuted: () => muted, ready: () => loading };
+  return { unlock, play, correct, wrong, fall, treeCrash, win, land, carve, boost, speak, startMusic, setMuted, isMuted: () => muted, ready: () => loading };
 }

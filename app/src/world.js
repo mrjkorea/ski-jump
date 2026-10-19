@@ -14,15 +14,6 @@ function colorGeo(g, hex) {
   g.setAttribute("color", new THREE.BufferAttribute(a, 3));
   return g;
 }
-function pineGeometry() {
-  const parts = [colorGeo(new THREE.CylinderGeometry(0.18, 0.25, 1.2, 5).translate(0, 0.6, 0), 0x7a4b2a)];
-  const tiers = [[1.7, 2.0, 1.4], [1.35, 1.8, 2.5], [0.95, 1.6, 3.5]];
-  tiers.forEach(([r, h, y], i) => {
-    parts.push(colorGeo(new THREE.ConeGeometry(r, h, 7).translate(0, y, 0), i % 2 ? 0x1f7a4d : 0x2a8c57));
-    parts.push(colorGeo(new THREE.ConeGeometry(r * 0.55, h * 0.42, 7).translate(0, y + h * 0.3, 0), 0xf4f8ff));
-  });
-  return mergeGeometries(parts.map((g) => g.toNonIndexed()));
-}
 function rampGeometry() {
   const w = RAMP_W / 2, L = RAMP_L, H = RAMP_H;
   const v = [
@@ -130,15 +121,21 @@ export function createWorld(container, labels, { quality: forceQ } = {}) {
   track.rotation.x = -Math.PI / 2; track.position.set(0, 0.01, -120); scene.add(track);
 
   // instanced pines + gates
-  const pineGeo = pineGeometry();
-  const pineMat = new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true });
-  const PINES = 170;
+  // detailed pines: the original painted pine texture on camera-facing instanced quads
+  const pineTex = tl.load("./textures/pine.webp"); pineTex.colorSpace = THREE.SRGBColorSpace;
+  pineTex.anisotropy = Math.min(4, renderer.capabilities.getMaxAnisotropy());
+  const PINE_H = 7, PINE_W = PINE_H * (356 / 640);
+  const pineGeo = new THREE.PlaneGeometry(PINE_W, PINE_H).translate(0, PINE_H / 2 - 0.15, 0);
+  const pineMat = new THREE.MeshBasicMaterial({ map: pineTex, alphaTest: 0.5, color: 0xf2f7ff });
+  const PINES = 190;
   const pines = new THREE.InstancedMesh(pineGeo, pineMat, PINES); pines.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
   scene.add(pines);
   const pineData = [];
   const placePine = (p, z) => {
     const side = Math.random() < 0.5 ? -1 : 1;
-    p.x = side * (TRACK + 3 + Math.pow(Math.random(), 1.6) * 60); p.z = z; p.s = 0.8 + Math.random() * 0.9; p.r = Math.random() * 6;
+    const edge = Math.random() < 0.42; // tree line right at the track edge (can be hit)
+    p.x = side * (edge ? TRACK + 1.6 + Math.random() * 2.6 : TRACK + 4.5 + Math.pow(Math.random(), 1.6) * 60);
+    p.z = z; p.s = 0.75 + Math.random() * 0.75; p.edge = edge;
   };
   for (let i = 0; i < PINES; i++) { const p = {}; placePine(p, 20 - Math.random() * 260); pineData.push(p); }
   const POLES = 40;
@@ -165,7 +162,6 @@ export function createWorld(container, labels, { quality: forceQ } = {}) {
     }
     scene.add(g); g.visible = false; return g;
   });
-  const crashTree = new THREE.Mesh(pineGeo, pineMat); crashTree.visible = false; scene.add(crashTree);
 
   // finish arch + crowd
   const finish = new THREE.Group(); finish.visible = false; scene.add(finish);
@@ -226,7 +222,6 @@ export function createWorld(container, labels, { quality: forceQ } = {}) {
   function showRow() {
     S.rowZ = ROW_START; S.rowVisible = true; S.rowDecided = false; S.treeLane = -1;
     ramps.forEach((r) => { r.visible = true; r.scale.set(1, 1, 1); });
-    crashTree.visible = false;
   }
   function hideRow() { S.rowVisible = false; ramps.forEach((r) => (r.visible = false)); }
   function launch(lane, streak = 1) {
@@ -235,21 +230,31 @@ export function createWorld(container, labels, { quality: forceQ } = {}) {
     skier.setPose("crouch");
   }
   function crash(lane) {
-    S.mode = "crash"; S.crashT = 0; S.treeLane = lane;
-    ramps[lane].visible = false;
-    crashTree.visible = true; crashTree.position.set(LANES[lane] + (S.x - LANES[lane]) * 0.6, 0, -1.2); crashTree.scale.setScalar(0.01);
+    // wrong ramp: ride over it, twirl in the air, then fall onto the snow
+    S.mode = "ramp"; S.airLane = lane; S.wrong = true;
+    skier.setPose("crouch");
+  }
+  function groundCrash(big) {
+    S.mode = "crash"; S.crashT = 0; S.crashDone = false; S.vy = 0;
     skier.setPose("crash"); skier.kick(-4);
     S.trauma = 1;
-    fx.burst(S.x, 0.6, -0.6, 70, { speed: 7, up: 6, size: 0.6, life: 1.2, colors: [0xffffff, 0xe8f3ff, 0xdfeaff], force: true });
-    fx.burst(S.x, 2.2, -1, 28, { speed: 4, up: 3, size: 0.32, life: 1.4, colors: [0x2a8c57, 0x1f7a4d, 0x7a4b2a], g: 6, force: true });
+    fx.burst(S.x, 0.4, -0.4, big ? 90 : 70, { speed: 7, up: 6, size: 0.65, life: 1.3, colors: [0xffffff, 0xe8f3ff, 0xdfeaff], force: true });
   }
+  function treeCrash(p) {
+    S.airLane = -1;
+    groundCrash(false);
+    fx.burst(p.x, 3, 0, 30, { speed: 3, up: 2, size: 0.5, life: 1.6, colors: [0xffffff, 0xf2f7ff], g: 5, force: true }); // snow off the branches
+    fx.burst(p.x, 2.2, 0, 16, { speed: 3, up: 2.5, size: 0.3, life: 1.3, colors: [0x2a6b3f, 0x1f5a35, 0x6b4a2a], g: 6, force: true });
+    events.push({ type: "treecrash" });
+  }
+
   function ceremony(cb) {
     S.mode = "ceremony"; S.cerT = 0; S.cerCb = cb; hideRow();
     finish.visible = true; finish.position.set(0, 0, -17);
   }
   function reset() {
     S.x = 0; S.vx = 0; S.y = 0; S.vy = 0; S.mode = S.skiing ? "ski" : "idle"; S.rowZ = null; S.timeScale = 1; S.tsTarget = 1;
-    S.trauma = 0; finish.visible = false; crashTree.visible = false; hideRow(); skier.reset(); events.length = 0;
+    S.trauma = 0; S.wrong = false; finish.visible = false; hideRow(); skier.reset(); events.length = 0;
   }
   function setSkiing(on) { S.skiing = !!on; if (on && (S.mode === "idle" || S.mode === "crash" || S.mode === "ceremony")) S.mode = "ski"; if (!on && S.mode === "ski") S.mode = "idle"; }
   function pullEvents() { return events.splice(0, events.length); }
@@ -279,8 +284,7 @@ export function createWorld(container, labels, { quality: forceQ } = {}) {
     if (S.mode === "ski") {
       const target = S.steer * 9;
       S.vx += (target - S.vx) * Math.min(1, dt * 6);
-      S.x = THREE.MathUtils.clamp(S.x + S.vx * dt, -TRACK + 1.2, TRACK - 1.2);
-      if (Math.abs(S.x) >= TRACK - 1.21) S.vx *= 0.5;
+      S.x = THREE.MathUtils.clamp(S.x + S.vx * dt, -TRACK - 4.5, TRACK + 4.5);
     } else if (S.mode === "air" || S.mode === "ramp") {
       S.vx *= Math.exp(-dt * 3); S.x += S.vx * dt;
       if (S.airLane >= 0) S.x += (LANES[S.airLane] - S.x) * Math.min(1, dt * 3);
@@ -305,31 +309,32 @@ export function createWorld(container, labels, { quality: forceQ } = {}) {
       }
       if (S.rowZ > 40) hideRow();
     }
-    if (S.treeLane >= 0) {
-      crashTree.position.z = Math.min(crashTree.position.z + dz, 0.4);
-      const s = crashTree.scale.x; crashTree.scale.setScalar(s + (1.25 - s) * Math.min(1, dt * 14));
-    }
 
     // vertical: ramp ride → flight → landing
     if (S.mode === "ramp") {
       const over = S.rowZ; // distance into the ramp
       S.y = THREE.MathUtils.clamp(over / RAMP_L, 0, 1) * RAMP_H;
       if (over >= RAMP_L) {
-        S.mode = "air"; S.vy = 9.5; skier.setPose("jump"); skier.kick(1.2);
+        S.mode = "air"; S.vy = 9.5; skier.setPose(S.wrong ? "twirl" : "jump"); skier.kick(1.2);
         fx.burst(S.x, RAMP_H, 0, 30, { speed: 3, up: 4, size: 0.4, life: 0.8, colors: [0xffffff, 0xe0efff] });
         S.fovKick = 1;
       }
     } else if (S.mode === "air") {
       S.vy -= 13 * dt; S.y += S.vy * dt;
-      if (S.vy < 5 && S.vy > -4) { skier.setPose("tuck"); S.tsTarget = 0.38; } else S.tsTarget = 1;
-      if (S.y <= 0) {
+      if (S.wrong) S.tsTarget = 1;
+      else if (S.vy < 5 && S.vy > -4) { skier.setPose("tuck"); S.tsTarget = 0.38; } else S.tsTarget = 1;
+      if (S.y <= 0 && S.wrong) {
+        S.y = 0; S.wrong = false; S.airLane = -1; S.tsTarget = 1;
+        groundCrash(true); events.push({ type: "fall" });
+      } else if (S.y <= 0) {
         S.y = 0; S.vy = 0; S.mode = "ski"; S.tsTarget = 1; S.airLane = -1;
         skier.setPose("land"); skier.kick(-3.2); S.trauma = Math.max(S.trauma, 0.25);
         fx.burst(S.x, 0.1, 0.2, 60, { speed: 6, up: 3.5, size: 0.55, life: 0.9, colors: [0xffffff, 0xeaf4ff, 0xd8e9ff] });
         events.push({ type: "land" }); S.landT = 0.35;
       }
     } else if (S.mode === "crash") {
-      S.crashT += dt; S.y = Math.max(0, Math.sin(Math.min(1, S.crashT * 1.4) * Math.PI) * 1.1);
+      S.crashT += dt; S.y = Math.max(0, Math.sin(Math.min(1, S.crashT * 2.2) * Math.PI) * 0.45);
+      if (S.crashT < 0.6 && Math.random() < dt * 30) fx.emit({ x: S.x + (Math.random() - 0.5), y: 0.2, z: (Math.random() - 0.5), vx: (Math.random() - 0.5) * 4, vy: 2 + Math.random() * 2, vz: 2, life: 0.7, size: 0.5, color: 0xffffff, force: true });
       if (S.crashT > 1.7 && !S.crashDone) { S.crashDone = true; events.push({ type: "crashdone" }); }
     } else if (S.mode === "ceremony") {
       S.cerT += dt; S.y = 0;
@@ -359,7 +364,8 @@ export function createWorld(container, labels, { quality: forceQ } = {}) {
     // scenery treadmill
     for (let i = 0; i < pineData.length; i++) {
       const p = pineData[i]; p.z += dz; if (p.z > 45) placePine(p, p.z - 270);
-      v3.set(p.x, 0, p.z); q.setFromAxisAngle(up, p.r); sc.setScalar(p.s); m4.compose(v3, q, sc); pines.setMatrixAt(i, m4);
+      v3.set(p.x, 0, p.z); q.setFromAxisAngle(up, Math.atan2(camPos.x - p.x, camPos.z - p.z)); sc.setScalar(p.s); m4.compose(v3, q, sc); pines.setMatrixAt(i, m4);
+      if (S.mode === "ski" && i < pines.count && Math.abs(p.z) < 0.75 && Math.abs(p.x - S.x) < 0.5 * p.s + 0.35) treeCrash(p);
     }
     pines.instanceMatrix.needsUpdate = true;
     for (let i = 0; i < POLES; i++) {
@@ -415,7 +421,7 @@ export function createWorld(container, labels, { quality: forceQ } = {}) {
     const scale = THREE.MathUtils.clamp((spacing * 0.94) / maxW, 0.32, 1.15);
     const fade = show ? THREE.MathUtils.clamp((S.rowZ + 62) / 10, 0, 1) : 0;
     labels.forEach((el, i) => {
-      if (!show || S.treeLane === i) { el.style.opacity = "0"; return; }
+      if (!show) { el.style.opacity = "0"; return; }
       const p = toScreen(LANES[i], RAMP_H + 2.6, S.rowZ - RAMP_L);
       el.style.opacity = p.vis ? fade.toFixed(2) : "0";
       el.style.transform = `translate(-50%, -100%) translate(${p.x.toFixed(1)}px, ${p.y.toFixed(1)}px) scale(${scale.toFixed(3)})`;

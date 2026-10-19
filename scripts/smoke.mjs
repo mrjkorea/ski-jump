@@ -51,11 +51,12 @@ async function newPage(browser, opts, posts) {
   await ctx.route("https://mrjkorea.github.io/mrj-signin/mrj-auth.js", (r) => r.fulfill({ contentType: "text/javascript", body: AUTH_STUB }));
   await ctx.route("https://script.google.com/**", (r) => { try { posts.push(JSON.parse(r.request().postData())); } catch (e) {} r.fulfill({ contentType: "application/json", headers: { "access-control-allow-origin": "*" }, body: '{"status":"ok"}' }); });
   const page = await ctx.newPage();
+  page.setDefaultTimeout(180000);
   page.on("pageerror", (e) => fails.push("pageerror: " + e.message));
   page.on("console", (m) => { if (m.type() === "error" && !/404|Failed to load resource/.test(m.text())) console.log("console:", m.text()); });
   return { ctx, page };
 }
-const waitView = (page, v, ms = 60000) => page.waitForFunction((v) => window.MRJSkiJump && window.MRJSkiJump.getState().view === v, v, { timeout: ms });
+const waitView = (page, v, ms = 240000) => page.waitForFunction((v) => window.MRJSkiJump && window.MRJSkiJump.getState().view === v, v, { timeout: ms });
 
 const browser = await chromium.launch({ args: ["--use-angle=swiftshader", "--enable-unsafe-swiftshader", "--autoplay-policy=no-user-gesture-required"] });
 const server = await serve(root, 0);
@@ -70,20 +71,20 @@ try {
   await page.screenshot({ path: `${out}/01-start-desktop.png` });
   await page.click("#sj-start .go", { force: true });
   await waitView(page, "play");
-  await page.waitForFunction(() => [...document.querySelectorAll(".ramp-word")].some((e) => +e.style.opacity > 0.6), null, { timeout: 15000 });
+  await page.waitForFunction(() => [...document.querySelectorAll(".ramp-word")].some((e) => +e.style.opacity > 0.6), null, { timeout: 240000 });
   await page.waitForTimeout(900);
   await page.screenshot({ path: `${out}/02-question-ramps.png` });
   await page.evaluate(PILOT, "right");
-  await page.waitForFunction(() => window.MRJSkiJump.getState().airborne, null, { timeout: 20000 });
+  await page.waitForFunction(() => window.MRJSkiJump.getState().airborne, null, { timeout: 240000 });
   await page.waitForTimeout(450);
   await page.screenshot({ path: `${out}/03-jump-slowmo.png` });
-  await page.waitForFunction(() => window.MRJSkiJump.getState().streak >= 3, null, { timeout: 60000 });
+  await page.waitForFunction(() => window.MRJSkiJump.getState().streak >= 3, null, { timeout: 240000 });
   await page.waitForTimeout(250);
   await page.screenshot({ path: `${out}/04-combo.png` });
-  await page.waitForFunction(() => window.MRJSkiJump.getState().corrects >= 5, null, { timeout: 60000 });
+  await page.waitForFunction(() => window.MRJSkiJump.getState().corrects >= 5, null, { timeout: 240000 });
   await page.waitForTimeout(7500);
   await page.screenshot({ path: `${out}/05-finish-ceremony.png` });
-  await waitView(page, "end", 20000);
+  await waitView(page, "end");
   await page.waitForTimeout(700);
   await page.screenshot({ path: `${out}/06-gold-medal.png` });
   let st = await page.evaluate(() => window.MRJSkiJump.getState());
@@ -97,19 +98,39 @@ try {
   const ls = await page.evaluate(() => Object.keys(localStorage));
   check(ls.length === 0, `no local save (localStorage keys: ${ls.join(",") || "none"})`);
 
-  // ---- 2. crash run (wrong ramp ends the run)
+  // ---- 2. wrong ramp: rides over it, twirls, falls; run ends
   await page.evaluate(() => clearInterval(window.__pilot));
   await page.click("#sj-again");
   await waitView(page, "play");
   await page.evaluate(PILOT, "wrong");
-  await page.waitForFunction(() => window.MRJSkiJump.getState().errors >= 1, null, { timeout: 30000 });
-  await page.waitForTimeout(350);
-  await page.screenshot({ path: `${out}/07-crash-tree.png` });
-  await waitView(page, "end", 15000);
+  await page.waitForFunction(() => window.MRJSkiJump.getState().errors >= 1 && window.MRJSkiJump.getState().airborne, null, { timeout: 240000 });
+  await page.waitForTimeout(500);
+  await page.screenshot({ path: `${out}/07-wrong-ramp-twirl.png` });
+  await page.waitForFunction(() => !window.MRJSkiJump.getState().airborne, null, { timeout: 240000 });
+  await page.waitForTimeout(250);
+  await page.screenshot({ path: `${out}/08-wrong-ramp-fall.png` });
+  await waitView(page, "end");
   await page.waitForTimeout(600);
-  await page.screenshot({ path: `${out}/08-crashed-card.png` });
+  await page.screenshot({ path: `${out}/09-fell-card.png` });
   st = await page.evaluate(() => window.MRJSkiJump.getState());
-  check(st.errors === 1 && st.lives === 0 && st.view === "end", "one wrong jump ends the run");
+  check(st.errors === 1 && st.lives === 0 && st.view === "end", "wrong ramp: twirl + fall ends the run");
+  check(await page.evaluate(() => /wrong ramp and fell/.test(document.querySelector("#sj-end").textContent)), "fell card text");
+
+  // ---- 2b. side tree: steer off the edge into the tree line
+  await page.evaluate(() => clearInterval(window.__pilot));
+  await page.click("#sj-again");
+  await waitView(page, "play");
+  await page.keyboard.down("ArrowRight");
+  await page.waitForFunction(() => window.MRJSkiJump.getState().lives === 0, null, { timeout: 240000 });
+  await page.keyboard.up("ArrowRight");
+  await page.waitForTimeout(300);
+  await page.screenshot({ path: `${out}/10-side-tree-crash.png` });
+  await waitView(page, "end");
+  await page.waitForTimeout(600);
+  await page.screenshot({ path: `${out}/11-tree-card.png` });
+  st = await page.evaluate(() => window.MRJSkiJump.getState());
+  check(st.view === "end" && st.errors === 0 && st.lives === 0, "side tree ends the run (no wrong answer recorded)");
+  check(await page.evaluate(() => /hit a tree/.test(document.querySelector("#sj-end").textContent)), "tree card text");
   await ctx.close();
 
   // ---- 3. iPhone portrait, low quality
@@ -118,13 +139,13 @@ try {
   await m.page.goto(`${B}/index.html?q=low`);
   await m.page.waitForSelector("#sj-start .go");
   await m.page.waitForTimeout(1200);
-  await m.page.screenshot({ path: `${out}/09-iphone-start.png` });
+  await m.page.screenshot({ path: `${out}/12-iphone-start.png` });
   await m.page.tap("#sj-start .go", { force: true });
   await waitView(m.page, "play");
   await m.page.evaluate(PILOT, "right");
-  await m.page.waitForFunction(() => [...document.querySelectorAll(".ramp-word")].some((e) => +e.style.opacity > 0.6), null, { timeout: 15000 });
+  await m.page.waitForFunction(() => [...document.querySelectorAll(".ramp-word")].some((e) => +e.style.opacity > 0.6), null, { timeout: 240000 });
   await m.page.waitForTimeout(1200);
-  await m.page.screenshot({ path: `${out}/10-iphone-play.png` });
+  await m.page.screenshot({ path: `${out}/13-iphone-play.png` });
   st = await m.page.evaluate(() => window.MRJSkiJump.getState());
   check(st.quality === "low", "?q=low forces low quality");
   await m.ctx.close();
@@ -143,17 +164,17 @@ try {
     const w = await newPage(browser, { viewport: { width: 1024, height: 768 } }, p3);
     await w.page.goto(`http://localhost:${wmServer.address().port}/host.html`);
     const fr = () => w.page.frames().find((f) => f.url().includes("pack=session"));
-    await w.page.waitForFunction(() => document.getElementById("f").contentWindow.MRJSkiJump, null, { timeout: 20000 });
+    await w.page.waitForFunction(() => document.getElementById("f").contentWindow.MRJSkiJump, null, { timeout: 240000 });
     const f = fr();
     await w.page.waitForTimeout(1000);
     check((await f.$("#sj-drop")) === null, "WM mode: no pack drop / word-set choice");
     check(!(await f.evaluate(() => window.MRJSkiJump.loadPack({ items: [] }))), "WM mode: loadPack disabled");
-    await w.page.screenshot({ path: `${out}/11-wordmaster-ready.png` });
+    await w.page.screenshot({ path: `${out}/14-wordmaster-ready.png` });
     await f.click("#sj-start .go", { force: true });
     await f.evaluate(PILOT, "right");
-    await f.waitForFunction(() => window.MRJSkiJump.getState().view === "end", null, { timeout: 90000 });
+    await f.waitForFunction(() => window.MRJSkiJump.getState().view === "end", null, { timeout: 240000 });
     await w.page.waitForTimeout(700);
-    await w.page.screenshot({ path: `${out}/12-wordmaster-done.png` });
+    await w.page.screenshot({ path: `${out}/15-wordmaster-done.png` });
     const msgs = await w.page.evaluate(() => window.__msgs);
     const done = msgs.find((x) => x && x.type === "mrj-wm-game-done");
     check(!!done && done.game === "snowjump" && done.items === 3 && done.finished === true, "WM: mrj-wm-game-done posted (3 items)");

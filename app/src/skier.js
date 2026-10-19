@@ -8,6 +8,7 @@ const POSES = {
   tuck:   { knee: 1.7,  lean: 0.95, arm: 1.25, elbow: -1.7, spread: 0.02, head: 0.75 },
   land:   { knee: 1.55, lean: 0.55, arm: 0.95, elbow: -0.6, spread: 0.7,  head: 0.45 },
   crash:  { knee: 0.6,  lean: -0.2, arm: 2.2,  elbow: -0.2, spread: 1.25, head: -0.3 },
+  twirl:  { knee: 0.9,  lean: 0.05, arm: 1.6,  elbow: -0.2, spread: 1.35, head: 0.0 },
   cheer:  { knee: 0.15, lean: -0.05, arm: 2.95, elbow: -0.15, spread: 0.45, head: -0.15 },
 };
 
@@ -70,7 +71,7 @@ export function createSkier() {
   root.traverse((o) => { if (o.isMesh) o.castShadow = false; });
 
   const cur = { ...POSES.ski };
-  let target = "ski", t = 0, steer = 0, crashSpin = 0;
+  let target = "ski", t = 0, steer = 0, crashSpin = 0, twirl = 0;
   const squash = { v: 1, vel: 0 };
 
   function setPose(name) { if (POSES[name]) target = name; }
@@ -112,11 +113,14 @@ export function createSkier() {
       ar.el.rotation.x = -cur.elbow;
     }
     // body roll into turns; crash tumble
-    if (target === "crash") {
+    if (target === "twirl") {
+      twirl += dt * 15;
+      body.rotation.set(Math.sin(t * 7) * 0.45, twirl, Math.cos(t * 5) * 0.5);
+    } else if (target === "crash") {
       crashSpin += dt * 9 * Math.max(0, 1 - crashSpin / 9);
       body.rotation.set(-crashSpin * 0.9, crashSpin * 0.4, crashSpin * 0.7);
     } else {
-      crashSpin = 0;
+      crashSpin = 0; twirl = 0;
       body.rotation.set(0, -steer * 0.25, -steer * 0.32);
     }
   }

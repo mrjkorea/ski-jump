@@ -144,8 +144,8 @@ export function startGame(root, { pack, studentId = "", sessionMode = false, qua
       world.launch(lane, c.streak);
       c.pendingLand = { correct: true, dead: false, goLand: remaining() === 0 };
     } else {
-      c.errors += 1; c.lives = 0; c.streak = 0;
-      audio.wrong(); toast("TREE!", "bad"); world.crash(lane);
+      c.errors += 1; c.lives = 0; c.streak = 0; c.deadReason = "fall";
+      audio.wrong(); toast("Oops!", "bad"); world.crash(lane);
       c.pendingLand = { correct: false, dead: true, goLand: false };
     }
     record(tr.item, resp, ok, latency); hudUpdate();
@@ -176,7 +176,7 @@ export function startGame(root, { pack, studentId = "", sessionMode = false, qua
     const name = esc(c.studentId);
     end.innerHTML = `<div class="medal ${dead ? "crash" : "gold"}"><span>${dead ? "!" : "★"}</span></div>
       <h2>${dead ? "Crashed!" : "Gold medal!"}</h2>
-      <p>${dead ? `${name} hit a tree. Start again.` : `${name} got ${target()} right. The crowd cheered and they put a gold medal on.`}</p>
+      <p>${dead ? (c.deadReason === "tree" ? `${name} hit a tree. Start again.` : `${name} jumped the wrong ramp and fell. Start again.`) : `${name} got ${target()} right. The crowd cheered and they put a gold medal on.`}</p>
       <div class="stats"><div><b>${c.points}</b><span>points</span></div><div><b>${acc}%</b><span>accurate</span></div><div><b>${c.best}</b><span>best combo</span></div></div>
       ${board.length > 1 ? `<div class="board">${board.slice(0, 8).map((b, k) => `${k + 1}. ${esc(b.student_id)} — ${b.points} pts`).join("<br>")}</div>` : ""}
       <button class="go" id="sj-again" type="button">Start again</button>`;
@@ -185,7 +185,7 @@ export function startGame(root, { pack, studentId = "", sessionMode = false, qua
   }
   function restart() {
     Object.assign(c, { points: 0, errors: 0, lives: LIVES, corrects: 0, roundDone: {}, mrjRoundPosted: false, records: [], trial: null,
-      jumping: false, pendingLand: null, view: "play", holdSteer: 0, pointerSteer: 0, boost: 0, streak: 0, best: 0 });
+      jumping: false, pendingLand: null, view: "play", holdSteer: 0, pointerSteer: 0, boost: 0, streak: 0, best: 0, deadReason: "" });
     $("#sj-end").classList.add("hidden"); $("#sj-end").innerHTML = "";
     world.reset(); world.setSkiing(true); seed();
     if (c.corrects >= target()) { world.setSkiing(false); return finish(); }
@@ -283,6 +283,13 @@ export function startGame(root, { pack, studentId = "", sessionMode = false, qua
       for (const ev of world.pullEvents()) {
         if (ev.type === "hit") answer(ev.lane);
         else if (ev.type === "land" || ev.type === "crashdone") landed();
+        else if (ev.type === "fall") { audio.fall(); toast("CRASH!", "bad"); }
+        else if (ev.type === "treecrash" && !c.pendingLand) {
+          // side tree: the run ends (no word answered, so no word row)
+          c.lives = 0; c.streak = 0; c.deadReason = "tree"; if (c.trial) c.trial.locked = true;
+          audio.treeCrash(); toast("TREE!", "bad"); showPlay(false); world.hideRow();
+          c.pendingLand = { correct: false, dead: true, goLand: false };
+        }
         else if (ev.type === "missed" && c.trial && !c.trial.locked) { toast("Missed! Try again", "warn"); nextTrial(false); }
       }
     } else world.pullEvents();

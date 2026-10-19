@@ -3,6 +3,11 @@ Ski Jump audio (local files only — no speechSynthesis, no /api/tts).
 SFX (procedural, baked to mp3):
   ski-jump.mp3, snow-whoosh.mp3, tree-crash.mp3, crowd-cheer.mp3
 
+Fall / thud:
+  snow-thud.mp3 — "bfh1_hit_02" from "75 CC0 breaking / falling / hit sfx" by rubberduck
+  License: CC0. https://opengameart.org/content/75-cc0-breaking-falling-hit-sfx
+  Low-passed, loudness-normalised, mono 64 kbps mp3.
+
 Music loop:
   music-christmas-synths.mp3 — "Happy synths loop with slight christmas feeling" by 3xBlast
   License: CC0 (public domain). https://opengameart.org/content/happy-synths-loop-with-slight-christmas-feeling

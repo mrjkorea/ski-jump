@@ -69,7 +69,7 @@ fs.writeFileSync(path.join(outDir, "index.html"), html);
 if (wmDir) {
   // runtime files the game fetches: textures (webp), SFX + music, credits
   const copy = (rel) => { fs.mkdirSync(path.dirname(path.join(wmDir, rel)), { recursive: true }); fs.copyFileSync(path.join(root, rel), path.join(wmDir, rel)); };
-  for (const t of ["snow.webp", "crowd.webp"]) copy("textures/" + t);
-  for (const a of ["snow-whoosh.mp3", "ski-jump.mp3", "crowd-cheer.mp3", "tree-crash.mp3", "music-christmas-synths.mp3", "CREDITS.txt"]) copy("audio/" + a);
+  for (const t of ["snow.webp", "crowd.webp", "pine.webp"]) copy("textures/" + t);
+  for (const a of ["snow-whoosh.mp3", "ski-jump.mp3", "crowd-cheer.mp3", "tree-crash.mp3", "snow-thud.mp3", "music-christmas-synths.mp3", "CREDITS.txt"]) copy("audio/" + a);
 }
 console.log(`published ${js} ${css} -> ${outDir} (build ${build})`);
