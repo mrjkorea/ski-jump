@@ -26,6 +26,14 @@ Words come from the **JSON pack** (`packs/starter-en.json`), not from a list bak
 
 The game uses **baked local mp3 files** in `audio/` (offline). It does not call a TTS server and does not use `speechSynthesis`.
 
+## Combo
+
+Get answers right in a row for a combo: every 3 in a row adds a multiplier (×2, ×3, ×4) to the +100 and the chime goes higher. A wrong ramp still ends the run.
+
+## Sound
+
+Music and sound effects start after the first tap. Use the speaker button (top right) to mute.
+
 ## Tips
 
 - Gaps between ramps skip that jump.
