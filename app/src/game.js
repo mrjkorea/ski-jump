@@ -35,12 +35,11 @@ export function startGame(root, { pack, studentId = "", sessionMode = false, qua
     <div class="steer-hint hidden" id="sj-hint"><span>◀</span><em>tap sides to steer · slide up = faster</em><span>▶</span></div>
     <div class="card start" id="sj-start">
       <div class="logo"><b>SKI</b><b>JUMP</b></div>
-      <p class="lead">Read the meaning. Ski onto the ramp with the right word. A wrong ramp is a tree!</p>
+      <div class="mrj-h2p" id="mrj-h2p"><h2>HOW TO PLAY</h2><ul class="mrj-h2p-list"><li><span class="ic">📖</span>Read the meaning at the top.</li><li><span class="ic">⛷️</span>Ski onto the ramp with the right word.</li><li><span class="ic">🌲</span>Wrong ramp or a tree = crash!</li></ul><div class="mrj-h2p-ctl"><div class="ctl"><b>💻 Computer</b><span><kbd>←</kbd><kbd>→</kbd> steer</span><span><kbd>↑</kbd> go faster</span></div><div class="ctl"><b>📱 Touch</b><span>👈 Tap left side = go left</span><span>👉 Tap right side = go right</span><span>👆 Slide up = go faster</span></div></div></div>
       <form id="sj-form">
         <input id="sj-input" type="text" maxlength="24" placeholder="Your name" autocomplete="nickname" />
         <button class="go" type="submit">Start skiing</button>
       </form>
-      <p class="keys">Phone / tablet: tap left or right side · slide up to go faster<br>Computer: ← → or A D · ↑ or W faster</p>
       <label class="drop" id="sj-drop">Teachers: drop an Excel / CSV / JSON pack here
         <input id="lf-file" type="file" accept=".xlsx,.xls,.csv,.json" hidden />
       </label>
@@ -167,6 +166,7 @@ export function startGame(root, { pack, studentId = "", sessionMode = false, qua
     mrjPostRound(e, c, target(), dead);
     if (!dead) wmDone(c, e);
     c.view = "end"; c.trial = null; world.setSkiing(false); showPlay(false);
+    audio.stopMusic(); setTimeout(() => { if (c.view === "end") audio.stopAll(); }, 2500); // run end: music off, then AudioContext suspended
     const acc = c.records.length ? Math.round((c.records.filter((r) => r.correct).length / c.records.length) * 100) : 0;
     const i = board.findIndex((b) => b.student_id === c.studentId && b.pack_id === e.pack_id);
     const row = { student_id: c.studentId, pack_id: e.pack_id, points: c.points, accuracy: acc, errors: c.errors, ended_at: new Date().toISOString() };
@@ -187,6 +187,7 @@ export function startGame(root, { pack, studentId = "", sessionMode = false, qua
     Object.assign(c, { points: 0, errors: 0, lives: LIVES, corrects: 0, roundDone: {}, mrjRoundPosted: false, records: [], trial: null,
       jumping: false, pendingLand: null, view: "play", holdSteer: 0, pointerSteer: 0, boost: 0, streak: 0, best: 0, deadReason: "" });
     $("#sj-end").classList.add("hidden"); $("#sj-end").innerHTML = "";
+    audio.unlock(); audio.startMusic();
     world.reset(); world.setSkiing(true); seed();
     if (c.corrects >= target()) { world.setSkiing(false); return finish(); }
     refill(); nextTrial(true); hudUpdate();
@@ -316,6 +317,11 @@ export function startGame(root, { pack, studentId = "", sessionMode = false, qua
       e = p; c.pack = p; c.roundDone = {}; refill(); hudUpdate(); return true;
     },
   };
+  // Word Master close / tab hidden / page unload: stop all sound
+  const mrjHardStop = () => { audio.stopAll(); };
+  window.addEventListener("message", (ev) => { const d = ev.data; if (d === "mrj-stop" || (d && d.type === "mrj-stop")) mrjHardStop(); });
+  window.addEventListener("pagehide", mrjHardStop);
+  document.addEventListener("visibilitychange", () => { if (document.hidden) mrjHardStop(); else if (c.view === "play") { audio.unlock(); audio.startMusic(); } });
   window.MRJSkiJump = api; window.SkiJump = api;
   return api;
 }

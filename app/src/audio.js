@@ -116,6 +116,9 @@ export function createAudio() {
       }
     }
   }
+  // hard stop: music + loops off, AudioContext suspended (the next unlock() inside a tap resumes it)
+  function stopMusic() { wantMusic = false; try { musicSrc && musicSrc.stop(); } catch (e) {} try { musicSrc && musicSrc.disconnect(); } catch (e) {} musicSrc = null; }
+  function stopAll() { stopMusic(); if (ctx && ctx.state === "running") ctx.suspend().catch(() => {}); }
   function setMuted(m) {
     muted = !!m;
     if (ctx) {
@@ -124,5 +127,5 @@ export function createAudio() {
     }
     return muted;
   }
-  return { unlock, play, correct, wrong, fall, treeCrash, win, land, carve, boost, speak, startMusic, setMuted, isMuted: () => muted, ready: () => loading };
+  return { unlock, play, correct, wrong, fall, treeCrash, win, land, carve, boost, speak, startMusic, stopMusic, stopAll, state: () => (ctx ? ctx.state : "none"), setMuted, isMuted: () => muted, ready: () => loading };
 }
