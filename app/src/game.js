@@ -2,6 +2,7 @@ import { createWorld } from "./world.js";
 import { createAudio } from "./audio.js";
 import { mrjPost, mrjPostRound, seedFromRows, wmDone } from "./report.js";
 import { shuffle } from "./pack.js";
+import { isMrjTeacher, onMrjTeacher } from "./mrj-teacher.js";
 
 export const VERSION = "1.0.0";
 const LIVES = 3;          // shown in state for reporting; one wrong jump still ends the run (as before)
@@ -142,6 +143,9 @@ export function startGame(root, { pack, studentId = "", sessionMode = false, qua
       floatText(m > 1 ? `+100 ×${m}` : "+100", m > 1 ? "combo" : "");
       world.launch(lane, c.streak);
       c.pendingLand = { correct: true, dead: false, goLand: remaining() === 0 };
+    } else if (isMrjTeacher()) {
+      audio.wrong(); toast("Try again", "warn");
+      tr.locked = false; c.jumping = false; nextTrial(false);
     } else {
       c.errors += 1; c.lives = 0; c.streak = 0; c.deadReason = "fall";
       audio.wrong(); toast("Oops!", "bad"); world.crash(lane);
@@ -192,7 +196,14 @@ export function startGame(root, { pack, studentId = "", sessionMode = false, qua
     if (c.corrects >= target()) { world.setSkiing(false); return finish(); }
     refill(); nextTrial(true); hudUpdate();
   }
-  function seed() { seedFromRows(e, c, progressRows, target()); }
+  function seed() {
+    if (isMrjTeacher()) {
+      for (const it of e.items || []) if (it) c.roundDone[it.item_id] = true;
+      c.corrects = target();
+      return;
+    }
+    seedFromRows(e, c, progressRows, target());
+  }
   function begin(name) {
     c.studentId = String(name || studentId || (window.MRJ_AUTH && window.MRJ_AUTH.student && window.MRJ_AUTH.student()) || "Student").slice(0, 24);
     c.startedAt = new Date().toISOString(); c.view = "play";
@@ -286,7 +297,7 @@ export function startGame(root, { pack, studentId = "", sessionMode = false, qua
         else if (ev.type === "land" || ev.type === "crashdone") landed();
         else if (ev.type === "fall") { audio.fall(); toast("CRASH!", "bad"); }
         else if (ev.type === "treecrash" && !c.pendingLand) {
-          // side tree: the run ends (no word answered, so no word row)
+          if (isMrjTeacher()) { toast("Tree — try again", "warn"); nextTrial(false); continue; }
           c.lives = 0; c.streak = 0; c.deadReason = "tree"; if (c.trial) c.trial.locked = true;
           audio.treeCrash(); toast("TREE!", "bad"); showPlay(false); world.hideRow();
           c.pendingLand = { correct: false, dead: true, goLand: false };
@@ -322,6 +333,11 @@ export function startGame(root, { pack, studentId = "", sessionMode = false, qua
   window.addEventListener("message", (ev) => { const d = ev.data; if (d === "mrj-stop" || (d && d.type === "mrj-stop")) mrjHardStop(); });
   window.addEventListener("pagehide", mrjHardStop);
   document.addEventListener("visibilitychange", () => { if (document.hidden) mrjHardStop(); else if (c.view === "play") { audio.unlock(); audio.startMusic(); } });
+  onMrjTeacher(() => {
+    seed();
+    hudUpdate();
+    if (c.view === "play") nextTrial(false);
+  });
   window.MRJSkiJump = api; window.SkiJump = api;
   return api;
 }
