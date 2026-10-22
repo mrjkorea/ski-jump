@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import { makeRenderer, guardContext } from "./gl-guard.js";
+import { makeRenderer, guardContext, SoftRenderer, clearGlMsg } from "./gl-guard.js";
 import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
 import { createSkier } from "./skier.js";
 import { createParticles, createSnowfall } from "./fx.js";
@@ -73,7 +73,9 @@ function bannerTexture(text) {
 
 export function createWorld(container, labels, { quality: forceQ } = {}) {
   const dpr = window.devicePixelRatio || 1;
-  const renderer = makeRenderer(THREE, { antialias: dpr < 1.5, powerPreference: "high-performance", alpha: false }); // retries safer settings, clear error if no WebGL
+  let renderer = makeRenderer(THREE, { antialias: dpr < 1.5, powerPreference: "high-performance", alpha: false }); // WebGL, or a 2D-canvas SoftRenderer if WebGL is missing
+  // weak / software GPU (SwiftShader, llvmpipe, Basic Render, old Intel HD) or no GPU at all: lightest mode from the first frame
+  let weak = !!renderer.mrjWeak, fpsCap = renderer.isSoft ? 24 : weak ? 30 : 0, lastDraw = 0, drawN = 0, drawT = 0;
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.setClearColor(0xbfe3ff);
   container.appendChild(renderer.domElement);
@@ -94,7 +96,7 @@ export function createWorld(container, labels, { quality: forceQ } = {}) {
       float s = max(0.0, dot(normalize(vP), sun)); c += vec3(1.0,0.93,0.75) * (pow(s, 600.0) * 1.2 + pow(s, 12.0) * 0.25);
       gl_FragColor = vec4(c, 1.0); }`,
   }));
-  scene.add(sky);
+  scene.add(sky); scene.userData.softSky = ["#3d8bff", "#9fd2ff", "#d7ecff"]; // 2D-canvas fallback sky
 
   // layered mountains (parallax against steering)
   const mountains = [
@@ -115,11 +117,11 @@ export function createWorld(container, labels, { quality: forceQ } = {}) {
   snowTex.wrapS = snowTex.wrapT = THREE.RepeatWrapping; snowTex.repeat.set(10, 50); snowTex.colorSpace = THREE.SRGBColorSpace;
   snowTex.anisotropy = Math.min(4, renderer.capabilities.getMaxAnisotropy());
   const ground = new THREE.Mesh(new THREE.PlaneGeometry(240, 320), new THREE.MeshLambertMaterial({ map: snowTex, color: 0xffffff, emissive: 0x52617a }));
-  ground.rotation.x = -Math.PI / 2; ground.position.z = -120; scene.add(ground);
+  ground.rotation.x = -Math.PI / 2; ground.position.z = -120; scene.add(ground); ground.material.userData.softBack = 1; // 2D-canvas fallback: always behind
   // groomed track (slightly bluer corduroy) + edge lines
   const trackTex = snowTex.clone(); trackTex.repeat.set(3, 60); trackTex.needsUpdate = true;
   const track = new THREE.Mesh(new THREE.PlaneGeometry(TRACK * 2, 320), new THREE.MeshLambertMaterial({ map: trackTex, color: 0xeef6ff, emissive: 0x4a5c7a }));
-  track.rotation.x = -Math.PI / 2; track.position.set(0, 0.01, -120); scene.add(track);
+  track.rotation.x = -Math.PI / 2; track.position.set(0, 0.01, -120); scene.add(track); track.material.userData.softBack = 2;
 
   // instanced pines + gates
   // detailed pines: the original painted pine texture on camera-facing instanced quads
@@ -197,14 +199,14 @@ export function createWorld(container, labels, { quality: forceQ } = {}) {
     airLane: -1,
   };
   const events = [];
-  let quality = forceQ || "high", fpsAcc = 0, fpsN = 0, fpsWin = 0, lowLocked = !!forceQ;
+  let quality = forceQ || (weak ? "ultra" : "high"), fpsAcc = 0, fpsN = 0, fpsWin = 0, lowLocked = !!forceQ || weak;
 
   function setQuality(q) {
     quality = q;
-    const cap = q === "high" ? 1.75 : q === "low" ? 1 : 0.75;
+    const cap = q === "high" ? 1.75 : q === "low" ? 1 : weak ? 0.6 : 0.75, soft = !!renderer.isSoft;
     renderer.setPixelRatio(Math.min(dpr, cap));
-    pines.count = q === "high" ? PINES : q === "low" ? 100 : 60;
-    snow.setCount(q === "high" ? 900 : q === "low" ? 350 : 150);
+    pines.count = soft ? 36 : q === "high" ? PINES : q === "low" ? 100 : 60;
+    snow.setCount(soft ? 70 : q === "high" ? 900 : q === "low" ? 350 : 150);
     fx.setBudget(q === "high" ? 1 : q === "low" ? 0.5 : 0.3);
     resize();
   }
@@ -219,7 +221,14 @@ export function createWorld(container, labels, { quality: forceQ } = {}) {
   window.addEventListener("resize", resize);
   setQuality(quality);
   // GPU dropped the context: pause drawing + message; on restore continue in low quality
-  const glState = guardContext(renderer, container, { onRestored: () => { if (quality === "high") setQuality("low"); } });
+  // never restored / lost again -> switch to the 2D-canvas renderer (same scene, no student action)
+  function toSoft() {
+    const old = renderer.domElement, soft = new SoftRenderer(); soft.mrjGpu = "canvas2d"; soft.mrjWeak = true;
+    soft.domElement.className = old.className; soft.setClearColor(0xbfe3ff); old.replaceWith(soft.domElement);
+    try { renderer.dispose(); } catch (e) { /* ignore */ }
+    renderer = soft; weak = true; fpsCap = 24; lowLocked = true; glState = { lost: false, count: 0 }; clearGlMsg(container); setQuality("ultra");
+  }
+  let glState = guardContext(renderer, container, { onRestored: () => { if (quality === "high") setQuality("low"); }, onFallback: toSoft });
 
   // ---- API
   function showRow() {
@@ -450,7 +459,10 @@ export function createWorld(container, labels, { quality: forceQ } = {}) {
     stepLabels();
     snow.update(dtReal, S.speed, camPos.x);
     watchFps(dtReal);
-    if (!glState.lost) renderer.render(scene, camera);
+    if (glState.lost) return;
+    const now = performance.now(); if (fpsCap && now - lastDraw < 1000 / fpsCap - 4) return; // frame-rate cap on weak PCs
+    lastDraw = now; drawN++; if (now - drawT >= 1000) { diag.drawFps = (drawN * 1000) / (now - drawT); drawN = 0; drawT = now; }
+    renderer.render(scene, camera);
   }
 
   // A miss is reported after the row passes (so the kid sees the gap).
@@ -458,8 +470,10 @@ export function createWorld(container, labels, { quality: forceQ } = {}) {
   events.push = (e) => { if (e.type === "pending-miss") { S._pendingMiss = true; return events.length; } return _push(e); };
 
   resize();
+  const diag = { get renderer() { return renderer; }, get gpu() { return renderer.mrjGpu || ""; }, get weak() { return weak; }, get soft() { return !!renderer.isSoft; }, get quality() { return quality; }, get fpsCap() { return fpsCap; }, drawFps: 0 };
+  window.MRJ_STAGE3D = diag; // read-only diagnostics for tests
   return {
-    renderer, camera, scene, S,
+    get renderer() { return renderer; }, camera, scene, S,
     showRow, hideRow, launch, crash, ceremony, reset, setSkiing, pullEvents, tick, skierScreen, toScreen,
     setSteer(v) { S.steer = THREE.MathUtils.clamp(v, -1, 1); },
     setBoost(b) { S.boost = b; },
