@@ -1,6 +1,7 @@
 import "@fontsource/fredoka/latin-500.css";
 import "@fontsource/fredoka/latin-700.css";
 import "./style.css";
+import { showGlFatal } from "./gl-guard.js";
 import { fetchPack, fileToPack, normalizePack } from "./pack.js";
 import { startGame } from "./game.js";
 
@@ -46,7 +47,4 @@ async function boot() {
     drop.addEventListener("drop", (ev) => { ev.preventDefault(); drop.classList.remove("over"); ev.dataTransfer.files[0] && take(ev.dataTransfer.files[0]); });
   }
 }
-boot().catch((err) => {
-  app.innerHTML = `<div class="fatal"><h2>Ski Jump</h2><p></p></div>`;
-  app.querySelector(".fatal p").textContent = err.message;
-});
+boot().catch((err) => { console.error(err); showGlFatal(app, "Ski Jump", err); });

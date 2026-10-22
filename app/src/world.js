@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { makeRenderer, guardContext } from "./gl-guard.js";
 import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
 import { createSkier } from "./skier.js";
 import { createParticles, createSnowfall } from "./fx.js";
@@ -72,7 +73,7 @@ function bannerTexture(text) {
 
 export function createWorld(container, labels, { quality: forceQ } = {}) {
   const dpr = window.devicePixelRatio || 1;
-  const renderer = new THREE.WebGLRenderer({ antialias: dpr < 1.5, powerPreference: "high-performance", alpha: false });
+  const renderer = makeRenderer(THREE, { antialias: dpr < 1.5, powerPreference: "high-performance", alpha: false }); // retries safer settings, clear error if no WebGL
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.setClearColor(0xbfe3ff);
   container.appendChild(renderer.domElement);
@@ -217,6 +218,8 @@ export function createWorld(container, labels, { quality: forceQ } = {}) {
   }
   window.addEventListener("resize", resize);
   setQuality(quality);
+  // GPU dropped the context: pause drawing + message; on restore continue in low quality
+  const glState = guardContext(renderer, container, { onRestored: () => { if (quality === "high") setQuality("low"); } });
 
   // ---- API
   function showRow() {
@@ -447,7 +450,7 @@ export function createWorld(container, labels, { quality: forceQ } = {}) {
     stepLabels();
     snow.update(dtReal, S.speed, camPos.x);
     watchFps(dtReal);
-    renderer.render(scene, camera);
+    if (!glState.lost) renderer.render(scene, camera);
   }
 
   // A miss is reported after the row passes (so the kid sees the gap).
