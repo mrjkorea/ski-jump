@@ -1,4 +1,6 @@
 // WebGL safety net (shared by the MRJ 3D games). No student action is ever needed:
+// three is pinned to r162: the last release whose WebGLRenderer falls back to WebGL1 when WebGL2 is missing
+// (e.g. Intel HD 2000, old NVIDIA on nouveau). r163+ is WebGL2-only and failed with 'Error creating WebGL context'.
 // 1) makeRenderer: try normal -> safe -> low-power WebGL. Detect weak/software GPUs (SwiftShader, llvmpipe,
 //    Microsoft Basic Render, old Intel HD/GMA) and flag them so the game starts in its lightest mode.
 //    If WebGL is missing entirely, return a SoftRenderer that draws the same scene on a plain 2D canvas.
@@ -6,7 +8,7 @@
 //    back, or keeps getting lost, switch to the SoftRenderer automatically (onFallback).
 import { SoftRenderer } from "./soft-renderer.js";
 export { SoftRenderer };
-export const WEAK_GPU_RE = /swiftshader|llvmpipe|softpipe|basic render|microsoft basic|software|mesa offscreen|intel.*(gma|hd graphics( [2-5]\d{3}|\s*$|\)|,)|g41|g45|q45)/i;
+export const WEAK_GPU_RE = /swiftshader|llvmpipe|softpipe|basic render|microsoft basic|software|mesa offscreen|nouveau|nv[5-9a][0-9a-f]\b|geforce (8|9|g|gt )?[1-3]\d0\b|intel.*(gma|hd graphics( [2-5]\d{3}|\s*$|\)|,)|g41|g45|q45)/i;
 const wantSoft = () => { try { return /[?&]gl=soft\b/.test(location.search); } catch (e) { return false; } };
 export function gpuName(r) {
   try { const gl = r.getContext(); const ext = gl.getExtension("WEBGL_debug_renderer_info"); return String(ext ? gl.getParameter(ext.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER)); } catch (e) { return ""; }
@@ -15,7 +17,7 @@ export function makeRenderer(THREE, opts) {
   if (!wantSoft()) {
     const tries = [opts, { ...opts, antialias: false, powerPreference: "default" }, { ...opts, antialias: false, powerPreference: "low-power", precision: "mediump", failIfMajorPerformanceCaveat: false }];
     for (const o of tries) {
-      try { const r = new THREE.WebGLRenderer(o); if (r.getContext()) { r.mrjGpu = gpuName(r); r.mrjWeak = WEAK_GPU_RE.test(r.mrjGpu); return r; } } catch (e) { /* next */ }
+      try { const r = new THREE.WebGLRenderer(o); if (r.getContext()) { r.mrjGpu = gpuName(r); r.mrjWebGL1 = !r.capabilities.isWebGL2; r.mrjWeak = r.mrjWebGL1 || WEAK_GPU_RE.test(r.mrjGpu); return r; } } catch (e) { /* next */ }
     }
   }
   const s = new SoftRenderer(); s.mrjGpu = "canvas2d"; s.mrjWeak = true; return s;

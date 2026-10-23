@@ -14,7 +14,7 @@
   },
   "dependencies": {
     "@fontsource/fredoka": "^5.3.0",
-    "three": "^0.170.0",
+    "three": "^0.162.0",
     "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz"
   }
 }
