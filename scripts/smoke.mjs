@@ -6,7 +6,7 @@ import fs from "node:fs";
 import path from "node:path";
 
 const root = path.resolve(path.dirname(new URL(import.meta.url).pathname), "..");
-const out = path.resolve(process.argv[2] || "/workspace/snowjump-shots");
+const out = path.resolve(process.argv[2] || "shots");
 const wmDir = process.argv[3] ? path.resolve(process.argv[3]) : null;
 fs.mkdirSync(out, { recursive: true });
 const TYPES = { ".html": "text/html", ".js": "text/javascript", ".mjs": "text/javascript", ".css": "text/css", ".json": "application/json", ".webp": "image/webp", ".mp3": "audio/mpeg", ".woff2": "font/woff2", ".woff": "font/woff", ".jpg": "image/jpeg" };
